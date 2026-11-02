@@ -105,7 +105,7 @@
 |---|---|---|
 | provision | 解析失败 ⇒ `{ok:false,gate:'parse'}` 类结构化输出；CLI 顶层 catch ⇒ `exit 1`；门禁不过/未投放 ⇒ `exit 2`；**绝不就地找替代品** | `provision.mjs:271-276` · 宪法 P4/S1 |
 | fetch/build（骨架） | 显式 `exit 2`（SCAFFOLD）+ 打印计划输入/输出；M1 实现后：缺参/缺 NDK/校验失败 ⇒ 非零并说明原因 | `fetch:46-53` · `build.sh:50-58` · 宪法 S7 |
-| CI | 每步显式断言预期退出码（未投放=2）；其它非零视为工具缺陷 | workflow `:37-45` |
+| CI | 每步显式断言预期退出码（未投放=2）；其它非零视为工具缺陷 | workflow `:37-45`（⚠️ `bash -e` 下断言分支不可达，登记于 000-scaffold/plan.md §7；M1-T5 修复） |
 | 发布面 | `RELEASE=false` 或缺 Token ⇒ 任务禁用（静默不发，但不报错——这是**有意**的防误发语义） | `publish.gradle.kts:133-139` |
 
 ### 4.3 供应链与许可

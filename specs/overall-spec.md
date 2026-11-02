@@ -108,7 +108,7 @@ Release 归档（⬜ M1）MUST 含：二进制 + 构建/获取元数据 + LICENS
 | 编号 | 级别 | 需求 | 可证伪的验收判据 | 状态 |
 |---|---|---|---|---|
 | FR-000-040 | MUST | CI 存在且在无二进制的检出上可绿（配置期门禁） | CI 配置期 job 全过（`gradle :uv-cli:tasks`） | ✅ |
-| FR-000-041 | MUST | CI 断言投放工具的退出码纪律：未投放时 `--check` 必须 = 2，其它非零视为工具缺陷 | 注入其它非零 ⇒ job 失败 | ✅ |
+| FR-000-041 | MUST | CI 断言投放工具的退出码纪律：未投放时 `--check` 必须 = 2，其它非零视为工具缺陷 | 注入其它非零 ⇒ job 失败 | ⚠️（`bash -e` 下断言分支不可达，登记于 000-scaffold/plan.md §7；M1-T5 修复） |
 | FR-000-042 | MUST | CI 对全部构建脚本做语法门（`.mjs` 语法检查 + shell 语法检查） | 任一脚本语法错误 ⇒ job 失败 | ✅ |
 | （规划引用） | — | 真实流水线：源码钉选下载 → 交叉编译（`--locked`）→ strip/改名 → 全门禁 → 归档 + `.sha256` + license 清单 → GitHub Release（tag 钉 commit）→ lock 人工回写 | 首个 Release 存在且 lock 变 released（规划 §9/§10 M1-T5，目标 G1/G2/G4） | ⬜ |
 

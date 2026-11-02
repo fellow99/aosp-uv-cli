@@ -125,7 +125,7 @@
 | 用法 | 行为 | 退出码 |
 |---|---|---|
 | `--check` | 校验已投放产物：`<MODULE_JNILIBS>/<abi>/<name>`；缺失 ⇒ 打印「未投放」并 **exit 2**（S1 语义）；存在则跑七门禁 + **兄弟文件检查**（目录内仅 `libuv_cli.so`） | 0 / 2 |
-| `--inspect <so>` | 打印某产物的门禁报告，**不写任何文件** | 0 / 2（解析失败 1） |
+| `--inspect <so>` | 打印某产物的门禁报告，**不写任何文件** | 0 / 2（非 ELF 解析失败同为 2）/ 1（文件读取等 IO 错误） |
 | `--out <dir> --from <so>` | 过门禁后投放单个 `.so` 到 `<dir>/<abi>/`，写 `META-INF/uv-cli.properties`，随后校验 `BANNED_IN_AAR` | 0 / 2 / 1 |
 | `--version <v> --abi <a>` | 选择 lock 中 release（默认 `active`）；未命中 ⇒ 抛错 exit 1 并列出现有条目 | — / 1 |
 | `--allow-page-align-4k` | 仅放行门禁 ⑦ 并打印「仅 bring-up」警告（`provision.mjs:162-167`） | — |
@@ -203,6 +203,7 @@
 - TC-01/02（配置期 + AAR 产出）、TC-03（未投放 exit 2）、TC-04（语法门）、TC-05（二进制不入库）已于 **2026-11-02 全过**（执行记录见 test-cases.md）。
 - provision 的门禁位负例矩阵（非 ELF / 非 PIE / 非 linker64 interp / 非 AArch64 / 越白名单 / 4K 对齐 / 哈希不符 / 兄弟文件混入）在 M1 首产时用真实/构造产物补齐（见 [../overall-test-cases.md](../overall-test-cases.md) §2.2 TC-M1-03~09）⬜。
 - CI 的退出码断言把「未投放=2」固化为回归线：任何改动若令未投放语义漂移，CI 即红（workflow `:37-45`）。
+  - ⚠️ 缺陷登记（2026-11-02 评审）：GHA 默认 `bash -e` 下 exit 2 即终止 step，`code=$?` 与「其它非零」分支不可达——「CI 即红」成立，但无法区分预期 2 与意外 1；M1-T5 改为 `code=0; node tools/provision.mjs --check || code=$?; [ "$code" -eq 2 ] || exit 1`。
 
 ---
 
