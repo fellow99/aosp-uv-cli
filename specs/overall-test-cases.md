@@ -52,6 +52,8 @@
 | TC-M1-11 | lock 回写为 released | L2 | `status=released` 且字段与产物一致（G4） | ⬜ |
 | TC-M1-12 | 发布卫生 | L1a | `RELEASE` 缺省时 Central/签名任务禁用；凭据不在仓库 | ⬜（M3 前置检查） |
 
+> **模块化落点（2026-11-03，规划 §10.2）**：本族已细化为逐条用例——fetch/试编/门禁 ①—⑦/strip/投放 → [`001-building/test-cases.md`](./001-building/test-cases.md)（TC-001-01~17）；lock 回写/CI 流水线/归档/断言修复 → [`002-building-workflow/test-cases.md`](./002-building-workflow/test-cases.md)（TC-002-01~16）。执行后先回模块文件，本表族级状态随之更新。
+
 ### 2.3 M2 真机探针（⬜ 规划引用，规划 §7.1；出口 G3）
 
 | 探针 | 判据 | 状态 |
@@ -62,6 +64,8 @@
 | P4 组合链路 | `UV_PYTHON` 指向 python-cli 物化解释器后 `uv venv` → `uv run python -c …` 成功 | ⬜ |
 | P5 cache 生效 | `uv cache dir` 输出 = `UV_CACHE_DIR` 值且目录落 filesDir | ⬜ |
 | P6 libc++ 供给 | 若 NEEDED 含 `libc++_shared.so`：未注入 `LD_LIBRARY_PATH` 启动失败为预期；注入后回程成功 | ⬜ |
+
+> **模块化落点（2026-11-03）**：P1–P6 已在 [`003-cli/test-cases.md`](./003-cli/test-cases.md) 展开为 **CLI 主用例全集 TC-003-00~17**（shell 域等价载体：adb `/data/local/tmp`；App 域/PTY 结论仍归消费方）。映射：P1→TC-003-01、P2→TC-003-05、P3→TC-003-07、P4→TC-003-14、P5→TC-003-03、P6→TC-003-12。
 
 ---
 
