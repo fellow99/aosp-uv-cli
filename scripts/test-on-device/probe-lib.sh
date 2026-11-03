@@ -29,7 +29,8 @@ run_case() {
   adb_sh 5 "mkdir -p '$WORK/ws/$id'" >/dev/null 2>&1
   local t0 t1 out rc verdict detail=""
   t0=$(date +%s%3N)
-  out=$(adb_sh "$tmo" "cd '$WORK/ws/$id' && $prefix sh -c '$cmd'" 2>&1); rc=$?
+  # 单层解析 + export 注入：前缀赋值(VAL=x cmd $(…))在 mksh 下不传递给命令替换，export 形式才全局生效
+  out=$(adb_sh "$tmo" "cd '$WORK/ws/$id' && export $prefix && $cmd" 2>&1); rc=$?
   t1=$(date +%s%3N)
   if [ "$rc" -eq 124 ]; then verdict=FAIL; detail="timeout(${tmo}s)";
   elif [ "$expect" = ok ] && [ "$rc" -eq 0 ]; then verdict=PASS
