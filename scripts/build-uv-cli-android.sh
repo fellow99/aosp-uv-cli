@@ -82,9 +82,6 @@ if command -v rustup >/dev/null 2>&1; then
   fi
 fi
 
-# 16KB 页对齐（门禁 ⑦ 硬要求；RUSTFLAGS 环境注入，不改源码树内配置）
-export RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384"
-
 # ── ③ 编译（cargo-ndk 主路线 / 环境变量回退路线；路线记录，FR-001-011）──────
 # Windows（MSYS/Git Bash）下 cargo/cc 是 Windows 进程，/c/... 形态路径无效 ⇒ cygpath -w 转换（Linux 无 cygpath 则原样）
 to_win() { command -v cygpath >/dev/null 2>&1 && cygpath -w "$1" || echo "$1"; }
@@ -92,6 +89,14 @@ export CC_aarch64_linux_android="$(to_win "$CLANG")"
 export CXX_aarch64_linux_android="$(to_win "$TOOLBIN/aarch64-linux-android${API}-clang++")"
 export AR_aarch64_linux_android="$(to_win "$TOOLBIN/llvm-ar")"
 echo "[build] CC=$CC_aarch64_linux_android AR=$AR_aarch64_linux_android"
+
+# 16KB 页对齐（门禁 ⑦ 硬要求）+ libgcc 空壳：NDK r23+ 已移除 libgcc，而 rustc android
+# 目标链接行固定含 -lgcc（2026-11-03 CI 实证：aws-lc-sys/jemalloc 全编过，仅最终链接
+# -lgcc 失败）⇒ 注入空壳库路径（确定性方案，不依赖 cargo-ndk shim 行为）
+GCC_SHIM_DIR="$OUT/shim-libgcc"; mkdir -p "$GCC_SHIM_DIR"
+"$TOOLBIN/llvm-ar" crs "$GCC_SHIM_DIR/libgcc.a"
+export RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384 -L native=$(to_win "$GCC_SHIM_DIR")"
+echo "[build] RUSTFLAGS=$RUSTFLAGS（libgcc shim: $GCC_SHIM_DIR/libgcc.a）"
 [[ -f "$SRC/Cargo.toml" ]] || die "源码树缺 Cargo.toml：$SRC"
 cd "$SRC"
 ROUTE="env-linker"
