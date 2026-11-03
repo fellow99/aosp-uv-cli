@@ -93,7 +93,7 @@ if (needDownload) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const res = await fetch(pin.url, { redirect: 'follow', signal: AbortSignal.timeout(60_000) });
-      if (!res.ok) die(1, `下载失败 HTTP ${res.status}（${pin.url}）`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`); // 5xx/429 也进重试
       buf = Buffer.from(await res.arrayBuffer());
       break;
     } catch (err) {

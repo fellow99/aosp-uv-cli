@@ -1,4 +1,4 @@
-# probe-report-device — 2026-11-03T04:33:31Z
+# probe-report-device — 2026-11-03T05:00:45Z
 
 - 设备：sdk_gphone64_x86_64（emulator-5554）· ABI=x86_64 · API=37 · PAGESIZE=4096 · 载体=ndk_translation(host=x86_64,abi=x86_64) · 农场=copy(ok=0)
 - 制品：libuv_cli.so host_sha=c6d9edfd1642e03fde1308b91ad4f57382a1925f38f0b83da0063b4ddaabcfb1 device_sha=c6d9edfd1642e03fde1308b91ad4f57382a1925f38f0b83da0063b4ddaabcfb1

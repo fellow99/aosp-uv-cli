@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-11-03T04:33:31.818Z",
+  "runAt": "2026-11-03T05:00:45.313Z",
   "device": "sdk_gphone64_x86_64 emulator-5554 abi=x86_64 api=37 pagesize=4096 carrier=ndk_translation(host=x86_64,abi=x86_64) farm=copy/ok=0",
   "artifact": {
     "path": "libuv_cli.so",
@@ -10,7 +10,7 @@
     "pass": 6,
     "fail": 0,
     "skip": 11,
-    "totalMs": 9627
+    "totalMs": 9513
   },
   "probes": [
     {
@@ -37,7 +37,7 @@
       "verdict": "PASS",
       "detail": "",
       "exit": 0,
-      "ms": 610,
+      "ms": 602,
       "stdout": "uv 0.13.6 (aarch64-linux-android)"
     },
     {
@@ -55,7 +55,7 @@
       "verdict": "PASS",
       "detail": "",
       "exit": 0,
-      "ms": 1898,
+      "ms": 1808,
       "stdout": "help-ok"
     },
     {
@@ -64,7 +64,7 @@
       "verdict": "PASS",
       "detail": "",
       "exit": 0,
-      "ms": 950,
+      "ms": 945,
       "stdout": "cache-ok"
     },
     {
@@ -73,7 +73,7 @@
       "verdict": "INFO",
       "detail": "",
       "exit": 0,
-      "ms": 1216,
+      "ms": 1210,
       "stdout": "error: unexpected argument '--bogus-flag' found  Usage: libuv_cli.so [OPTIONS] <COMMAND>  For more information, try '--help'. exit=2 error: unrecognized subcommand 'no-such-command'  Usage: libuv_cli.so [OPTIONS] <COMMAND>  For more information, try '--help'. exit=2"
     },
     {
@@ -91,7 +91,7 @@
       "verdict": "INFO",
       "detail": "",
       "exit": 0,
-      "ms": 1560,
+      "ms": 1523,
       "stdout": "error: No interpreter found for Python 3.12 in managed installations or search path  hint: uv embeds available Python downloads and may require an update to install new versions. Consider retrying on a newer version of uv. exit=2"
     },
     {
@@ -127,7 +127,7 @@
       "verdict": "PASS",
       "detail": "",
       "exit": 2,
-      "ms": 1743,
+      "ms": 1759,
       "stdout": "error: No download found for request: cpython-3.12-linux-aarch64-none"
     },
     {
@@ -145,7 +145,7 @@
       "verdict": "INFO",
       "detail": "",
       "exit": 0,
-      "ms": 596,
+      "ms": 599,
       "stdout": "uv 0.13.6 (aarch64-linux-android) exit=0"
     },
     {
@@ -190,7 +190,7 @@
       "verdict": "PASS",
       "detail": "",
       "exit": 0,
-      "ms": 918,
+      "ms": 931,
       "stdout": "xdg-ok=/data/local/tmp/uv-probe/xdg/uv"
     },
     {

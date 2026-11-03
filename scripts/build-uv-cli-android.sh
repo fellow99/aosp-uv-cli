@@ -85,16 +85,23 @@ fi
 # ── ③ 编译（cargo-ndk 主路线 / 环境变量回退路线；路线记录，FR-001-011）──────
 # Windows（MSYS/Git Bash）下 cargo/cc 是 Windows 进程，/c/... 形态路径无效 ⇒ cygpath -w 转换（Linux 无 cygpath 则原样）
 to_win() { command -v cygpath >/dev/null 2>&1 && cygpath -w "$1" || echo "$1"; }
-export CC_aarch64_linux_android="$(to_win "$CLANG")"
-export CXX_aarch64_linux_android="$(to_win "$TOOLBIN/aarch64-linux-android${API}-clang++")"
-export AR_aarch64_linux_android="$(to_win "$TOOLBIN/llvm-ar")"
+# Windows 形态选择：MSYS 下 cargo/cc 是原生进程，无法 exec POSIX sh 包装脚本——
+# cc/linker 用 NDK 的 .cmd 包装（Windows NDK 同名 .cmd），bin 工具用 .exe；CI(linux) 走原名
+pick() { if [[ -e "$1.cmd" || -e "$1.cmd.exe" ]]; then echo "$1.cmd"; else echo "$1"; fi; }
+pickexe() { if [[ -e "$1.exe" ]]; then echo "$1.exe"; else echo "$1"; fi; }
+CLANG_BIN="$(pick "$CLANG")"
+CLANGXX_BIN="$(pick "$TOOLBIN/aarch64-linux-android${API}-clang++")"
+AR_BIN="$(pickexe "$TOOLBIN/llvm-ar")"
+export CC_aarch64_linux_android="$(to_win "$CLANG_BIN")"
+export CXX_aarch64_linux_android="$(to_win "$CLANGXX_BIN")"
+export AR_aarch64_linux_android="$(to_win "$AR_BIN")"
 echo "[build] CC=$CC_aarch64_linux_android AR=$AR_aarch64_linux_android"
 # 目标链接行固定含 -lgcc（2026-11-03 CI 实证：aws-lc-sys/jemalloc 全编过，仅最终链接）
 # 16KB 页对齐（门禁 ⑦ 硬要求）+ libgcc 空壳：NDK r23+ 已移除 libgcc，而 rustc android
 # -lgcc 失败）⇒ 注入空壳库路径（确定性方案，不依赖 cargo-ndk shim 行为）
 GCC_SHIM_DIR="$OUT/shim-libgcc"; mkdir -p "$GCC_SHIM_DIR"
 GCC_SHIM_DIR="$(cd "$GCC_SHIM_DIR" && pwd)"   # 绝对路径：linker CWD=cargo 包根，相对 -L 解析不到（CI 实证）
-"$TOOLBIN/llvm-ar" crs "$GCC_SHIM_DIR/libgcc.a"
+"$AR_BIN" crs "$GCC_SHIM_DIR/libgcc.a"
 export RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384 -L native=$(to_win "$GCC_SHIM_DIR")"
 echo "[build] RUSTFLAGS=$RUSTFLAGS（libgcc shim: $GCC_SHIM_DIR/libgcc.a）"
 SRC="$(cd "$SRC" && pwd)"   # 绝对路径：后续 cd "$SRC" 编译，产物路径不能是相对形式（CI 实证：Finished 后找不到相对 BIN）
@@ -118,7 +125,7 @@ BIN="$SRC/target/aarch64-linux-android/release/uv"
 # ── ④ strip + 改名 libuv_cli.so（D6；strip 前后体积回填，FR-001-030/031）────
 mkdir -p "$OUT"
 SIZE_BEFORE=$(stat -c %s "$BIN")
-"$TOOLBIN/llvm-strip" --strip-unneeded "$BIN"
+"$(pickexe "$TOOLBIN/llvm-strip")" --strip-unneeded "$BIN"
 SIZE_AFTER=$(stat -c %s "$BIN")
 cp "$BIN" "$OUT/libuv_cli.so"
 SHA256=$(sha256sum "$OUT/libuv_cli.so" | cut -d' ' -f1)
@@ -134,14 +141,18 @@ while read -r line; do
   [[ $first -eq 1 ]] || NEEDED_JSON+=","
   NEEDED_JSON+="\"$name\""
   first=0
-done < <("$TOOLBIN/llvm-readelf" -d "$OUT/libuv_cli.so" | grep 'NEEDED')
+done < <("$(pickexe "$TOOLBIN/llvm-readelf")" -d "$OUT/libuv_cli.so" | grep 'NEEDED')
 NEEDED_JSON+="]"
 echo "[build] DT_NEEDED=${NEEDED_JSON}"
 
 # ── ⑥ 元数据（BUILD-METADATA.txt；规划 §4.2 ⑦ 归档形态）─────────────────────
 FETCH_META="$SRC/../FETCH-METADATA.json"
 CARGOLOCK_SHA=""
-[[ -f "$FETCH_META" ]] && CARGOLOCK_SHA="$(sed -n 's/.*"cargoLockSha256": "\([^"]*\)".*/\1/p' "$FETCH_META")"
+if [[ -f "$FETCH_META" ]]; then
+  CARGOLOCK_SHA="$(sed -n 's/.*"cargoLockSha256": "\([^"]*\)".*/\1/p' "$FETCH_META")"
+  FETCH_VER="$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' "$FETCH_META")"
+  [[ "$FETCH_VER" == "$UVVER" ]] || die "FETCH-METADATA 版本 $FETCH_VER ≠ --uv $UVVER（源码树错配）"
+fi
 RUSTVER="$(rustc -V 2>/dev/null || echo unknown)"
 CARGONDK_VER="$(cargo-ndk --version 2>/dev/null || echo none)"
 BUILD_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

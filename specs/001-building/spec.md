@@ -20,7 +20,7 @@
 | FR-001-001 | MUST | uv 源单输入钉版：官方 release tarball 的 URL 模板 + 版本 + SHA-256 内置于 fetch 脚本钉选表（PINS） | PINS 字段齐全；改任一字节 ⇒ 校验失败（exit 2） |
 | FR-001-002 | MUST | 下载只走官方出处，不改源（P1）：解压后源码树与官方包逐字节一致（无补丁/无 fork；交叉参数经 cargo 配置/RUSTFLAGS 注入） | fetch 后对源码树抽查文件 sha256 与官方包一致；仓库与 `.dist/` 无补丁文件 |
 | FR-001-003 | MUST | fetch 幂等：已就位且哈希正确的输入跳过下载；损坏/缺文件自动重下 | 二次执行不重新下载（有跳过日志）；构造损坏文件 ⇒ 自动修复 |
-| FR-001-004 | MUST | 输出布局固定：`.dist/src/uv/`（源码树，含 `Cargo.lock`），可整目录删除重建 | 删除 `.dist/src` 后重跑，布局一致 |
+| FR-001-004 | MUST | 输出布局固定：`.dist/src/uv-src/`（源码树，含 `Cargo.lock`），可整目录删除重建 | 删除 `.dist/src` 后重跑，布局一致 |
 | FR-001-005 | MUST | 取侧元数据落盘：tarball sha256、`Cargo.lock` 整文件 sha256、版本、URL 记入 FETCH-METADATA.json（规划 §4.2 ⑦） | 文件存在且字段齐备；`Cargo.lock` sha256 复算一致 |
 | FR-001-006 | MUST NOT | 不得引入钉选表之外的任何源码/镜像/预编译二进制（P7：上游无 Android 产物，一律源码自建） | 钉选表外的下载请求 ⇒ 拒绝（exit 2） |
 

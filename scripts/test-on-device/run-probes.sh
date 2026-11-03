@@ -86,7 +86,7 @@ want() { [[ -z "$ONLY" ]] || echo ",$ONLY," | grep -q ",$1,"; }
 echo "== cases =="
 UB="$WORK/libuv_cli.so"   # 直呼物理件（载体域限制下唯一可证伪通路；真机域可另验 farm）
 if want TC-003-00; then
-  run_case TC-003-00 "部署自检" ok 10 "ls -l '$UB' | grep -q 'x' && test -x '$WORK/bin/uv' && echo env-ok"
+  run_case TC-003-00 "部署自检" ok 10 "ls -l '$UB' | cut -c1-10 | grep -q x && test -x '$WORK/bin/uv' && echo env-ok"
 fi
 ABI="$(adb_sh 5 'getprop ro.product.cpu.abi' | tr -d '\r')"
 HOST_ABI="$(adb_sh 5 'uname -m' | tr -d '\r')"
@@ -144,10 +144,10 @@ if want TC-003-08; then
 fi
 if want TC-003-09; then
   # sdist-only 样本：flake8 2.x 仅发 sdist（pin 记录于 003 plan §6-1）
-  [[ $NET_OK -eq 1 ]] && run_case TC-003-09 "sdist 拒收事实化" fail 300 "$UB venv vs >/dev/null && $UB pip install --python vs/bin/python 'flake8==2.0'" || skip_case TC-003-09 "sdist 拒收事实化" "依赖网络"
+  [[ $NET_OK -eq 1 ]] && run_case TC-003-09 "sdist 拒收事实化" fail 300 "$UB venv vs >/dev/null && $UB pip install --python vs/bin/python 'flake8==2.0'" 'error while building|sdist|build|compil|maturin|setuptools|wheel' || skip_case TC-003-09 "sdist 拒收事实化" "依赖网络"
 fi
 if want TC-003-10; then
-  run_case TC-003-10 "uv python install 禁用（C2/D7）" fail 90 "$UB python install 3.12"
+  run_case TC-003-10 "uv python install 禁用（C2/D7）" fail 90 "$UB python install 3.12" "No download found|unsupported|error"
 fi
 if want TC-003-11; then
   [[ $NET_OK -eq 1 ]] && run_case TC-003-11 "cache 增量核验" ok 300 "du -s '$WORK/cache' && $UB venv vc >/dev/null && $UB pip install --python vc/bin/python packaging && echo cache-hit-ok" || skip_case TC-003-11 "cache 增量核验" "依赖网络"
@@ -157,7 +157,7 @@ fi
 if want TC-003-12; then
   run_case TC-003-12a "LD_LIBRARY_PATH 反证①去注入" info 20 "$UB --version; echo exit=\$?"
   if [[ -n "$LIBCXX" ]]; then
-    run_case TC-003-12b "LD_LIBRARY_PATH 反证②注入libc++" ok 20 "LD_LIBRARY_PATH='$LIBCXX' $UB --version" "$ENV_PREFIX"
+    run_case TC-003-12b "LD_LIBRARY_PATH 反证②注入libc++" ok 20 "LD_LIBRARY_PATH='$LIBCXX' $UB --version"
   else
     skip_case TC-003-12b "LD_LIBRARY_PATH 反证②注入libc++" "DT_NEEDED 实测不含 libc++_shared.so（静态链命中，见 BUILD-METADATA dtNeeded）——本条记录性，无需反证"
   fi
@@ -169,14 +169,14 @@ fi
 # ── E. 组合与限制事实化 ─────────────────────────────────────────────────────
 if want TC-003-14; then
   if [[ -n "$PYPY" ]]; then
-    run_case TC-003-14 "UV_PYTHON 组合（P4）" ok 300 "UV_PYTHON='$PYPY' $UB venv v4 && UV_PYTHON='$PYPY' $UB pip install --python v4/bin/python six && cd v4 && UV_PYTHON='$PYPY' $UB run python -c 'import six;print(six.__version__)'" "$ENV_PREFIX"
+    run_case TC-003-14 "UV_PYTHON 组合（P4）" ok 300 "UV_PYTHON='$PYPY' $UB venv v4 && UV_PYTHON='$PYPY' $UB pip install --python v4/bin/python six && cd v4 && UV_PYTHON='$PYPY' $UB run python -c 'import six;print(six.__version__)'"
   else
     skip_case TC-003-14 "UV_PYTHON 组合（P4）" "未提供 --python-cli-interp（python-cli 物化产物）"
   fi
 fi
 if want TC-003-15; then
   if [[ $NET_OK -eq 1 ]]; then
-    run_case TC-003-15 "git 依赖源限制" fail 90 "$UB pip install 'six @ git+https://github.com/benjaminp/six.git'"
+    run_case TC-003-15 "git 依赖源限制" fail 90 "$UB pip install 'six @ git+https://github.com/benjaminp/six.git'" 'git|Git'
   else
     skip_case TC-003-15 "git 依赖源限制" "依赖网络（git 源解析在安装链路前端）"
   fi
@@ -196,17 +196,18 @@ fi
 MODEL="$(adb_sh 5 'getprop ro.product.model' | tr -d '\r')"
 APILEVEL="$(adb_sh 5 'getprop ro.build.version.sdk' | tr -d '\r')"
 SO_SHA_DEV="$(adb_sh 10 "sha256sum '$WORK/libuv_cli.so'" | cut -d' ' -f1 | tr -d '\r')"
-PASS_N=$(grep -c '"verdict":"PASS"' "$TMP_RESULTS/lines.jsonl" || true)
-FAIL_N=$(grep -c '"verdict":"FAIL"' "$TMP_RESULTS/lines.jsonl" || true)
-SKIP_N=$(grep -c '"verdict":"SKIP"' "$TMP_RESULTS/lines.jsonl" || true)
+[[ "$SO_SHA_HOST" == "$SO_SHA_DEV" ]] || { echo "制品 sha256 host≠device（push 损坏？）：$SO_SHA_HOST vs $SO_SHA_DEV" >&2; exit 1; }
+PASS_N=$(awk -F'	' '$3=="PASS"' "$TMP_RESULTS/lines.tsv" | wc -l)
+FAIL_N=$(awk -F'	' '$3=="FAIL"' "$TMP_RESULTS/lines.tsv" | wc -l)
+SKIP_N=$(awk -F'	' '$3=="SKIP"' "$TMP_RESULTS/lines.tsv" | wc -l)
 # JSON 合法性由 node 合并保证（sed 拼 JSONL 在含特殊字符时不可靠）
 node -e "
 const fs=require('fs');
-const lines=fs.readFileSync(process.argv[1],'utf8').split('\n').filter(x=>x.trim());
-const probes=lines.map(x=>JSON.parse(x));
-const report={runAt:new Date().toISOString(),device:\`$MODEL $SERIAL abi=$ABI api=$APILEVEL pagesize=$PAGESIZE carrier=$CARRIER farm=$FARM_MODE/ok=$FARM_OK\`,artifact:{path:$(basename "$SO" | sed "s/^/'/; s/$/'/"),sha256Host:'$SO_SHA_HOST',sha256Device:'$SO_SHA_DEV'},summary:{pass:$PASS_N,fail:$FAIL_N,skip:$SKIP_N,totalMs:$MS_ACC},probes};
+const lines=fs.readFileSync(process.argv[1],'utf8').split(String.fromCharCode(10)).filter(x=>x.trim());
+const probes=lines.map(l=>{const f=l.split('	');return{id:f[0],title:f[1],verdict:f[2],detail:f[3],exit:f[4]==='SKIP'?null:Number(f[4]),ms:Number(f[5]),stdout:f[6]||''}});
+const report={runAt:new Date().toISOString(),device:\`$MODEL $SERIAL abi=$ABI api=$APILEVEL pagesize=$PAGESIZE carrier=$CARRIER farm=$FARM_MODE/ok=$FARM_OK\`,artifact:{path:'$(basename "$SO")',sha256Host:'$SO_SHA_HOST',sha256Device:'$SO_SHA_DEV'},summary:{pass:$PASS_N,fail:$FAIL_N,skip:$SKIP_N,totalMs:$MS_ACC},probes};
 fs.writeFileSync(process.argv[2],JSON.stringify(report,null,2)+'\n');
-" "$TMP_RESULTS/lines.jsonl" "$REPORT_JSON"
+" "$TMP_RESULTS/lines.tsv" "$REPORT_JSON"
 {
   echo "# probe-report-device — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo
