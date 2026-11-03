@@ -98,6 +98,7 @@ GCC_SHIM_DIR="$(cd "$GCC_SHIM_DIR" && pwd)"   # 绝对路径：linker CWD=cargo 
 export RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384 -L native=$(to_win "$GCC_SHIM_DIR")"
 echo "[build] RUSTFLAGS=$RUSTFLAGS（libgcc shim: $GCC_SHIM_DIR/libgcc.a）"
 SRC="$(cd "$SRC" && pwd)"   # 绝对路径：后续 cd "$SRC" 编译，产物路径不能是相对形式（CI 实证：Finished 后找不到相对 BIN）
+OUT="$(mkdir -p "$OUT" && cd "$OUT" && pwd)"   # 同上：cp/readelf 发生在 cd "$SRC" 之后，相对 OUT 会落错树（CI 实证：provision ENOENT）
 [[ -f "$SRC/Cargo.toml" ]] || die "源码树缺 Cargo.toml：$SRC"
 cd "$SRC"
 ROUTE="env-linker"
