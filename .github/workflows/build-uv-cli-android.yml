@@ -126,6 +126,7 @@ jobs:
       - name: 归档（tar.gz + .sha256，FR-002-013）
         run: |
           VER='${{ steps.ver.outputs.version }}'
+          cp .dist/src/FETCH-METADATA.json build/out/
           (cd build/out && tar -czf "uv-cli-v${VER}-android-arm64-v8a.tar.gz" \
             libuv_cli.so BUILD-METADATA.txt FETCH-METADATA.json LICENSES gates-report.txt)
           (cd build/out && sha256sum "uv-cli-v${VER}-android-arm64-v8a.tar.gz" > "uv-cli-v${VER}-android-arm64-v8a.tar.gz.sha256")
