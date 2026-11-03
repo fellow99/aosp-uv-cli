@@ -91,9 +91,9 @@ export AR_aarch64_linux_android="$(to_win "$TOOLBIN/llvm-ar")"
 echo "[build] CC=$CC_aarch64_linux_android AR=$AR_aarch64_linux_android"
 
 # 16KB 页对齐（门禁 ⑦ 硬要求）+ libgcc 空壳：NDK r23+ 已移除 libgcc，而 rustc android
-# 目标链接行固定含 -lgcc（2026-11-03 CI 实证：aws-lc-sys/jemalloc 全编过，仅最终链接
 # -lgcc 失败）⇒ 注入空壳库路径（确定性方案，不依赖 cargo-ndk shim 行为）
 GCC_SHIM_DIR="$OUT/shim-libgcc"; mkdir -p "$GCC_SHIM_DIR"
+GCC_SHIM_DIR="$(cd "$GCC_SHIM_DIR" && pwd)"   # 绝对路径：linker CWD=cargo 包根，相对 -L 解析不到（CI 实证）
 "$TOOLBIN/llvm-ar" crs "$GCC_SHIM_DIR/libgcc.a"
 export RUSTFLAGS="-C link-arg=-Wl,-z,max-page-size=16384 -L native=$(to_win "$GCC_SHIM_DIR")"
 echo "[build] RUSTFLAGS=$RUSTFLAGS（libgcc shim: $GCC_SHIM_DIR/libgcc.a）"
