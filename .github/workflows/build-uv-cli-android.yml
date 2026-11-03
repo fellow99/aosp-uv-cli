@@ -1,14 +1,21 @@
-name: CI (scaffold) — aosp-uv-cli
+name: CI — aosp-uv-cli (uv → Android arm64 exec CLI)
 
-# 000-scaffold 阶段的 CI 只做「配置期门禁」：
-#   - Gradle 配置/任务求值（无 .so 也必须通过 —— FR：二进制缺失不阻碍配置期）
-#   - provision.mjs 语法与退出码纪律自检（未投放 = 退出码 2 = 预期）
-# 真实的交叉编译 + 门禁 + Release 流水线在 M1 接入（替换本文件）。
+# 002-building-workflow（FR-002-010~016）：
+#   config-check   —— M0 配置期门禁保留（无 .so 必须可配置 + 语法门 + 退出码断言【已修复：可区分预期 2 与意外 1】）
+#   build-arm64    —— 真实流水线：resolve → fetch(sha256) → 试编探针 → cargo build --locked → strip →
+#                     provision 全门禁 → 归档(+cargo 许可清单) → Release(仅 tag v<uvver>) → lock 回写素材
+# 发布卫生（P5）：非 tag 触发只构建不发布。
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+
+env:
+  UV_VERSION: '0.13.6' # 与 scripts/fetch-uv-cli-source.mjs PINS / uv-cli.lock.json active 一致（tag 触发时以 tag 为准并校验一致性）
+  NDK_VERSION: '28.2.13676358'
+  RUST_TOOLCHAIN: stable
 
 permissions:
   contents: read
@@ -34,17 +41,121 @@ jobs:
       - name: Gradle configuration gate（无 .so 必须可配置）
         run: gradle :uv-cli:tasks --console=plain
 
-      - name: provision.mjs syntax + exit-code discipline
+      - name: provision 退出码纪律（断言修复版：预期 2 与意外 1 可区分，FR-002-012）
         run: |
           node --check tools/provision.mjs
-          # 未投放产物时 --check 的预期退出码是 2（未投放），其它非零码视为工具缺陷。
-          node tools/provision.mjs --check
-          code=$?
-          if [ "$code" -ne 2 ]; then
-            echo "provision --check 退出码=$code（预期 2=未投放）"; exit 1
-          fi
+          code=0; node tools/provision.mjs --check || code=$?
+          [ "$code" -eq 2 ] || { echo "provision --check 退出码=$code（预期 2=未投放，其它=工具缺陷）"; exit 1; }
 
-      - name: scripts syntax
+      - name: scripts syntax（语法门覆盖全部脚本，FR-002-021）
         run: |
           node --check scripts/fetch-uv-cli-source.mjs
+          node --check tools/lock-writeback.mjs
           bash -n scripts/build-uv-cli-android.sh
+          bash -n scripts/test-on-device/run-probes.sh
+          bash -n scripts/test-on-device/env-contract.sh
+
+  build-android-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write # 仅 Release 步骤用；非 tag 路径不产生写动作
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version（tag v<uvver> 优先；tag↔lock active 一致性校验，FR-002-014）
+        id: ver
+        run: |
+          LOCK_VER=$(node -p "require('./uv-cli.lock.json').active.version")
+          TAG_VER=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_VER="${GITHUB_REF#refs/tags/v}"
+            if [ "$TAG_VER" != "$LOCK_VER" ]; then
+              echo "tag v$TAG_VER 与 lock active $LOCK_VER 不一致（P2 唯一事实源）"; exit 1
+            fi
+          fi
+          VER="${TAG_VER:-$LOCK_VER}"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "is_tag=$([[ -n "$TAG_VER" ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 21 + Gradle 9.4.1
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up rust（钉 uv 上游 rust-toolchain.toml 的 1.99.0 + aarch64-linux-android target，FR-002-010）
+        uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install cargo-ndk + cmake/ninja（aws-lc-sys 构建依赖，规划 §4.3 R2）
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq cmake ninja-build
+          cargo install cargo-ndk --locked
+
+      - name: Set up Android NDK ${{ env.NDK_VERSION }}
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;${NDK_VERSION}" > /dev/null
+          echo "ANDROID_NDK=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: fetch（uv 源 tarball，sha256 门，P1/P7）
+        run: node scripts/fetch-uv-cli-source.mjs --uv "${{ steps.ver.outputs.version }}" --out .dist/src
+
+      - name: Cache cargo（rust-cache：registry + target，key 含 Cargo.lock，FR-002-016；置于 fetch 后——Cargo.lock 才可寻）
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .dist/src/uv-src
+          cache-cargo-bin: true
+
+      - name: cargo 依赖许可清单（归档素材，FR-002-013）
+        run: |
+          mkdir -p build/out/LICENSES
+          cp LICENSE uv-cli/THIRD-PARTY-NOTICES.md build/out/LICENSES/
+          (cd .dist/src/uv-src && cargo metadata --locked --format-version 1 --no-deps=false) \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const m=JSON.parse(d);for(const p of m.packages){if(!p.license)continue;console.log(p.name+' '+p.version+' ['+p.license+']')}})" \
+            > build/out/LICENSES/cargo-dependency-licenses.txt
+          wc -l build/out/LICENSES/cargo-dependency-licenses.txt
+
+      - name: build（试编探针即首轮构建；失败即红，降级须先回写规划 §4.3 再重跑）
+        run: |
+          bash scripts/build-uv-cli-android.sh \
+            --uv "${{ steps.ver.outputs.version }}" --api 24 \
+            --src .dist/src/uv-src --ndk "$ANDROID_NDK" --out build/out
+
+      - name: 归档（tar.gz + .sha256，FR-002-013）
+        run: |
+          VER='${{ steps.ver.outputs.version }}'
+          (cd build/out && tar -czf "uv-cli-v${VER}-android-arm64-v8a.tar.gz" \
+            libuv_cli.so BUILD-METADATA.txt FETCH-METADATA.json LICENSES gates-report.txt)
+          (cd build/out && sha256sum "uv-cli-v${VER}-android-arm64-v8a.tar.gz" > "uv-cli-v${VER}-android-arm64-v8a.tar.gz.sha256")
+          ls -la build/out/
+
+      - name: lock 回写干跑（不落笔；素材就绪性证据）
+        run: |
+          node tools/lock-writeback.mjs \
+            --inputs build/out/lock-writeback-inputs.json \
+            --so build/out/libuv_cli.so --check \
+            || { echo "lock 回写素材校验未过"; exit 1; }
+          echo '## uv-cli build summary' >> "$GITHUB_STEP_SUMMARY"
+          echo "\`libuv_cli.so\` ${{ steps.ver.outputs.version }} 门禁全过；回写素材在 build/out/（released 落笔随 tag Release 人工 PR 回写，P2）" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uv-cli-v${{ steps.ver.outputs.version }}-android-arm64-v8a
+          path: |
+            build/out/libuv_cli.so
+            build/out/*.tar.gz
+            build/out/*.sha256
+            build/out/BUILD-METADATA.txt
+            build/out/FETCH-METADATA.json
+
+      - name: Release（仅 tag v<uvver>；非 tag 只构建不发布，FR-002-014/015）
+        if: steps.ver.outputs.is_tag == 'yes'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/out/uv-cli-v${{ steps.ver.outputs.version }}-android-arm64-v8a.tar.gz
+            build/out/uv-cli-v${{ steps.ver.outputs.version }}-android-arm64-v8a.tar.gz.sha256
+          generate_release_notes: true
