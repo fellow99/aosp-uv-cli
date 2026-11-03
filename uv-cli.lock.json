@@ -10,13 +10,25 @@
       "abi": "arm64-v8a",
       "androidApi": 24,
       "name": "libuv_cli.so",
-      "size": 0,
-      "sha256": "",
+      "size": 34979336,
+      "sha256": "c6d9edfd1642e03fde1308b91ad4f57382a1925f38f0b83da0063b4ddaabcfb1",
       "builtFrom": {
-        "source": "uv <ver> source tarball (github.com/astral-sh/uv releases), unmodified; Rust cross-compile",
-        "toolchain": "rust aarch64-linux-android target (tier2) + cargo-ndk; TLS via rustls with bundled roots",
-        "ndk": "TBD (first CI build pins NDK line + version)",
-        "flags": "TBD: -C link-arg=-Wl,-z,max-page-size=16384; strip"
+        "source": "uv 0.13.6 source tarball (github.com/astral-sh/uv releases), unmodified",
+        "toolchain": {
+          "rustVersion": "rustc 1.99.0 (b940084d7 2026-09-28)",
+          "cargoNdk": "none",
+          "target": "aarch64-linux-android",
+          "api": 24
+        },
+        "ndk": "28.2.13676358",
+        "flags": "-C link-arg=-Wl,-z,max-page-size=16384; llvm-strip --strip-unneeded",
+        "cargoLockSha256": "968afc762afac196109a89b7546ef2346ecca377208a70686d37a61fecc08d0a",
+        "tls": "rustls with bundled roots (provider per Cargo.lock)",
+        "needed": [
+          "libdl.so",
+          "libm.so",
+          "libc.so"
+        ]
       },
       "gates": {
         "eTypeEtDyn": true,
@@ -31,7 +43,7 @@
         "coordinates": "io.github.fellow99:uv-cli:0.13.6",
         "published": false
       },
-      "status": "draft"
+      "status": "released"
     }
   ],
   "matrix": {

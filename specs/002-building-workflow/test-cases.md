@@ -11,7 +11,7 @@
 |---|---|---|---|---|---|
 | TC-002-01 | 语法门 | — | `node --check tools/lock-writeback.mjs` | exit 0 | ⬜ |
 | TC-002-02 | 干跑校验 | 002-001 | `node tools/lock-writeback.mjs --inputs … --so … --check` | 打印将写入字段 diff；exit 0；lock 未变 | ⬜ |
-| TC-002-03 | 正式回写 | 002-001/004 | 去掉 `--check` 执行（lock 副本上） | size/sha256/gates/toolchain/needed 落笔；`status=released`；`active.version`/`coordinates` 同步；`published=false`；JSON 合法 | ⬜ |
+| TC-002-03 | 正式回写 | 002-001/004 | 去掉 `--check` 执行（lock 副本上） | size/sha256/gates/toolchain/needed 落笔；`status=released`；`active.version`/`coordinates` 同步；`published=false`；JSON 合法 | ✅（2026-11-03 tag v0.13.6 Release 后正式落笔，CI 素材 + 本地制品复算一致） |
 | TC-002-04 | released 单向守卫 | 002-002 | 对已 released 条目再次回写同素材 | exit 2；lock 不变 | ⬜ |
 | TC-002-05 | 版本不匹配守卫 | 002-002 | 素材 version ≠ lock 条目 version | exit 2；提示版本差异 | ⬜ |
 | TC-002-06 | 制品漂移守卫 | 002-003 | 素材 sha256 与目标 `.so` 复算不一致（改 1 字节） | exit 2；lock 不变 | ⬜ |

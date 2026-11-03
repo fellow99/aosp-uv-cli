@@ -4,7 +4,7 @@
 
 - [ ] T1 `tools/lock-writeback.mjs` 实现：素材读取 + 制品复算比对 + 逐字段回写 + `--check` 干跑（FR-002-001/003；python-cli 同款先例）
 - [ ] T2 回写字卫：status 单向 / 版本匹配 / 幂等 / 门禁自检前置（FR-002-002/005/006）
-- [ ] T3 回写后 `provision --check` ⑤⑥ 变硬比对验证（draft→released 语义切换）（FR-002-001 判据）
+- [x] T3 回写后 `provision --check` ⑤⑥ 变硬比对验证（draft→released 语义切换）（FR-002-001 判据）——**2026-11-03 已执行**：tag v0.13.6 Release 后 lock-writeback 落笔，--check 全过（⑤ sha 一致/⑥ size 一致），G4 达成
 - [ ] T4 workflow 重写：config-check 前置 job 保留 + build-android-arm64 真实 job（装机/fetch/build/门禁/归档）（FR-002-010/011）
 - [ ] T5 退出码断言修复（`code=… || code=$?` 口径）+ 负例自证（FR-002-012）
 - [ ] T6 归档清单实现（tar.gz + .sha256 + LICENSES + cargo 许可清单）（FR-002-013）
