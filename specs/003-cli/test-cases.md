@@ -53,19 +53,31 @@ SKIP（4K 页） |✅ |SKIP（网络） |SKIP（缺 python-cli） |SKIP（网络
 ## E2. App 域探针（probe-app，消费方形态；FR-003-050~055；TC-003-20~27）
 
 > 载体：probe-app APK（uv-cli AAR 依赖，useLegacyPackaging=true ⇒ libuv_cli.so 落 nativeLibraryDir）。
+
+> **执行记录（2026-11-03 App 域实测，报告 logs/20261103-1/probe-report-app.json）**：
+> 载体 = emulator-5554（Medium_Phone_API_37.0，x86_64 镜像 + ndk_translation；app 域 ABI 报告 arm64）。
+> **结果：8/8 全 PASS**。关键事实：
+> - **D1 有效性核验 ✅**：libuv_cli.so 落 /data/app/…/lib/arm64（nativeLibraryDir）且在
+>   untrusted_app SELinux 域 exec 成功——uv 0.13.6 (aarch64-linux-android) 回程（TC-003-21）；
+>   arm64 制品经 ndk_translation 在 x86_64 镜像的 App 域真实运行（消费方形态）；
+> - **filesDir 注入精确生效（P5）**：cache dir = /data/user/0/org.fellow99.uvprobe/files/uv/cache；
+> - **C2/D7 红线 App 域成立**：No download found for cpython-3.12-linux-aarch64-none；
+> - XDG 形态 <filesDir>/xdg/uv、退出码 2/2、help 直出——与 shell 域结论完全一致；
+> - 注：arm64 AVD（python_arm64_api35）在本机无法启动（emulator 37.2.12 FATAL：x86_64 宿主
+>   QEMU2 不支持 arm64 镜像）——App 域 arm64 执行由 ndk_translation 域承载（与 python probe 先例一致）。
 > 验证的是 adb shell 域无法覆盖的**消费方真实形态**：untrusted_app SELinux 域 exec（D1 有效性）、filesDir 注入。
 > 启动即自动执行，报告落 `filesDir/probe-report-app.json`，`adb shell cat` 回读。
 
 | # | 用例 | 覆盖 FR | 步骤 | 期望 | 状态 |
 |---|---|---|---|---|---|
-| TC-003-20 | App 域环境快照 | 050/054 | 读取 nativeDir/SELinux 域（id -Z）/文件标签（ls -Z）/filesDir 路径/制品 sha256 | 字段齐备入报告 | ⬜ |
-| TC-003-21 | App 域版本回程（P1 等价） | 051 | exec `nativeDir/libuv_cli.so --version` | `uv 0.13.6 …` 回程；exit 0；SELinux 不拒（D1 有效性 ✅/❌） | ⬜ |
-| TC-003-22 | filesDir 注入（P5 等价） | 052 | 注入 `UV_CACHE_DIR=<filesDir>/uv/cache` `HOME=<filesDir>/home` `TMPDIR=<filesDir>/tmp` → `uv cache dir` | 输出逐字符等于注入值；目录落 filesDir | ⬜ |
-| TC-003-23 | venv 失败形态（App 域） | 053 参考 | 注入后 `uv venv <filesDir>/venvs/t1` | 失败形态记录（无解释器语义）；目录请求落 filesDir 域 | ⬜ |
-| TC-003-24 | `uv python install` 禁用（C2/D7） | 053 | App 域执行 | 失败形态含 No download found；绝不静默成功 | ⬜ |
-| TC-003-25 | XDG 兜底（App 域） | 052 | 去 UV_CACHE_DIR、设 `XDG_CACHE_HOME=<filesDir>/xdg` | 输出 = `<XDG>/uv` 形态 | ⬜ |
-| TC-003-26 | 退出码采样（App 域） | — | `--bogus-flag`；`no-such-command` | exit=2 / exit=2（clap 口径） | ⬜ |
-| TC-003-27 | help 直出（App 域） | 051 | `uv help` / `uv pip --help` | 直出完成不挂起；exit 0 | ⬜ |
+| TC-003-20 | App 域环境快照 | 050/054 | 读取 nativeDir/SELinux 域（id -Z）/文件标签（ls -Z）/filesDir 路径/制品 sha256 | 字段齐备入报告 | ✅ |
+| TC-003-21 | App 域版本回程（P1 等价） | 051 | exec `nativeDir/libuv_cli.so --version` | `uv 0.13.6 …` 回程；exit 0；SELinux 不拒（D1 有效性 ✅/❌） | ✅ |
+| TC-003-22 | filesDir 注入（P5 等价） | 052 | 注入 `UV_CACHE_DIR=<filesDir>/uv/cache` `HOME=<filesDir>/home` `TMPDIR=<filesDir>/tmp` → `uv cache dir` | 输出逐字符等于注入值；目录落 filesDir | ✅ |
+| TC-003-23 | venv 失败形态（App 域） | 053 参考 | 注入后 `uv venv <filesDir>/venvs/t1` | 失败形态记录（无解释器语义）；目录请求落 filesDir 域 | ✅ |
+| TC-003-24 | `uv python install` 禁用（C2/D7） | 053 | App 域执行 | 失败形态含 No download found；绝不静默成功 | ✅ |
+| TC-003-25 | XDG 兜底（App 域） | 052 | 去 UV_CACHE_DIR、设 `XDG_CACHE_HOME=<filesDir>/xdg` | 输出 = `<XDG>/uv` 形态 | ✅ |
+| TC-003-26 | 退出码采样（App 域） | — | `--bogus-flag`；`no-such-command` | exit=2 / exit=2（clap 口径） | ✅ |
+| TC-003-27 | help 直出（App 域） | 051 | `uv help` / `uv pip --help` | 直出完成不挂起；exit 0 | ✅ |
 
 ## F. 执行记录（回填区，2026-11-03 实测回填）
 

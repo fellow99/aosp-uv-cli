@@ -38,6 +38,18 @@ SKIP（11，全部带归因，判据不可达≠不达标）：
 
 INFO 记录（4）：00b 环境快照；04 退出码采样（--bogus-flag=2、未知子命令=2，clap 口径符合预期）；06 venv --python 3.12 失败形态（`No interpreter found for Python 3.12`，exit 2）；12a LD_LIBRARY_PATH 去注入直呼成功（静态链佐证）
 
+## 三.5、App 域探针证据（probe-app，2026-11-03 补测；FR-003-050~055 / TC-003-20~27）
+
+**8/8 全 PASS**（报告 probe-report-app.json，commit 3a81fbe APK + e460b92 归档）：
+- **D1 有效性核验 ✅（本批最关键新增判据）**：libuv_cli.so 经 useLegacyPackaging 物理落盘
+  /data/app/…/lib/arm64（nativeLibraryDir），在 untrusted_app SELinux 域 exec 回程
+  uv 0.13.6 (aarch64-linux-android)——消费方真实形态的可执行性成立（adb shell 域覆盖不到的判据）；
+- P5 filesDir 注入精确生效：cache dir = <filesDir>/uv/cache（逐字符比对过）；
+- C2/D7 红线在 App 域同样成立：No download found for cpython-3.12-linux-aarch64-none；
+- XDG/退出码/help 与 shell 域结论完全一致（契约跨域一致性 ✅）；
+- 载体注记：arm64 AVD 本机不可启动（emulator 37.2.12 FATAL：x86_64 宿主 QEMU2 不支持 arm64 镜像），
+  App 域 arm64 执行由 ndk_translation 域承载；真机域复跑仍为待验项（不影响本轮 App 域结论）。
+
 ## 四、已知限制与待验项（不阻塞本里程碑）
 
 | # | 事项 | 归因 | 出口 |
