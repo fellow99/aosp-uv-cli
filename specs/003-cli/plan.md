@@ -45,6 +45,19 @@ scripts/test-on-device/
 | `SSL_CERT_FILE` | **永不注入**（D4）；反证用例临时注入 `/nonexistent` 后**清除** | FR-003-041 |
 | `UV_HTTP_TIMEOUT` | 30（网络用例防挂） | 防御性 |
 
+## 1.5 probe-app 设计（App 域探针载体，FR-003-050~055；2026-11-03 新增）
+
+镜像 aosp-python-cli/probe-app 形态（已验证可构建/可装/可跑）：
+
+| 项 | 取值 | 说明 |
+|---|---|---|
+| 工程形态 | `probe-app/` 独立 Gradle 工程（AGP 9.2.1；不进主仓 settings.gradle——000 单模块红线不动） | 依赖 `app/libs/uv-cli-release.aar`（本仓 `provision --out` 投放后 `assembleRelease` 产出） |
+| 打包 | `useLegacyPackaging=true` + manifest `extractNativeLibs=true`（D1）：`libuv_cli.so` 物理落盘 `nativeLibraryDir` | abiFilters 仅 arm64-v8a；x86_64 模拟器经 ndk_translation 可装可跑（python probe 先例） |
+| 探针执行 | `onCreate` 起后台线程自动全量运行（FR-003-055）；UI monospace 日志同步 | 无交互依赖，`am start` 即可 |
+| env 注入 | `UV_CACHE_DIR=<filesDir>/uv/cache` / `HOME=<filesDir>/home` / `TMPDIR=<filesDir>/tmp` / `PATH=<nativeDir>:/system/bin`（规划 §7 App 域实例化） | ProcessBuilder environment() |
+| 报告 | 逐条 {id,title,verdict,exit,ms,stdout,detail} → `filesDir/probe-report-app.json`（FR-003-054） | `adb shell cat` 回读 |
+| 用例 | TC-003-20~27（见 test-cases.md §E2） | App 域可证伪子集；PTY/网络族不在 App 域重复 |
+
 ## 2. 用例执行框架（FR-003-004/005）
 
 - `run_case <ID> <title> <timeout_s> -- <cmd…>`：设备侧 `cd ws/<ID> && env… $cmd`，采集

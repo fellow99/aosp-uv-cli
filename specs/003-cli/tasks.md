@@ -12,3 +12,4 @@
 - [ ] T8 组合探针 UV_PYTHON + uv run python（TC-003-14；python-cli 产物在场则跑，否则 SKIP）（FR-003-034；P4）
 - [ ] T9 git 依赖源限制事实化（TC-003-15）（FR-003-042）
 - [ ] T10 报告生成（JSON + Markdown 摘要 + 设备快照）+ test-cases.md 回填（FR-003-004/044）
+- [ ] T11 probe-app 实现（FR-003-050~055）：独立 Gradle 工程 + AAR 依赖 + App 域探针 8 条（TC-003-20~27）+ 自动执行 + JSON 落盘

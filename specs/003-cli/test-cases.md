@@ -50,6 +50,23 @@ SKIP（4K 页） |✅ |SKIP（网络） |SKIP（缺 python-cli） |SKIP（网络
 | TC-003-16 | XDG 兜底 | 003-031 | 子 env：去 `UV_CACHE_DIR`、设 `XDG_CACHE_HOME=<work>/xdg` → `$UV cache dir` | 输出 = XDG 注入值（或其 uv 子目录，形态如实记录） | §7 表 | ✅ |
 | TC-003-17 | 16KB 页采样 | 003-043 | 若 TC-003-00b 页大小=16384：复跑 01/05/07/12 核心链 | 16KB 设备核心用例结论记录；否则 SKIP（页大小已记录） | 规划 §4.1 16KB 行 | SKIP（4K 页） |
 
+## E2. App 域探针（probe-app，消费方形态；FR-003-050~055；TC-003-20~27）
+
+> 载体：probe-app APK（uv-cli AAR 依赖，useLegacyPackaging=true ⇒ libuv_cli.so 落 nativeLibraryDir）。
+> 验证的是 adb shell 域无法覆盖的**消费方真实形态**：untrusted_app SELinux 域 exec（D1 有效性）、filesDir 注入。
+> 启动即自动执行，报告落 `filesDir/probe-report-app.json`，`adb shell cat` 回读。
+
+| # | 用例 | 覆盖 FR | 步骤 | 期望 | 状态 |
+|---|---|---|---|---|---|
+| TC-003-20 | App 域环境快照 | 050/054 | 读取 nativeDir/SELinux 域（id -Z）/文件标签（ls -Z）/filesDir 路径/制品 sha256 | 字段齐备入报告 | ⬜ |
+| TC-003-21 | App 域版本回程（P1 等价） | 051 | exec `nativeDir/libuv_cli.so --version` | `uv 0.13.6 …` 回程；exit 0；SELinux 不拒（D1 有效性 ✅/❌） | ⬜ |
+| TC-003-22 | filesDir 注入（P5 等价） | 052 | 注入 `UV_CACHE_DIR=<filesDir>/uv/cache` `HOME=<filesDir>/home` `TMPDIR=<filesDir>/tmp` → `uv cache dir` | 输出逐字符等于注入值；目录落 filesDir | ⬜ |
+| TC-003-23 | venv 失败形态（App 域） | 053 参考 | 注入后 `uv venv <filesDir>/venvs/t1` | 失败形态记录（无解释器语义）；目录请求落 filesDir 域 | ⬜ |
+| TC-003-24 | `uv python install` 禁用（C2/D7） | 053 | App 域执行 | 失败形态含 No download found；绝不静默成功 | ⬜ |
+| TC-003-25 | XDG 兜底（App 域） | 052 | 去 UV_CACHE_DIR、设 `XDG_CACHE_HOME=<filesDir>/xdg` | 输出 = `<XDG>/uv` 形态 | ⬜ |
+| TC-003-26 | 退出码采样（App 域） | — | `--bogus-flag`；`no-such-command` | exit=2 / exit=2（clap 口径） | ⬜ |
+| TC-003-27 | help 直出（App 域） | 051 | `uv help` / `uv pip --help` | 直出完成不挂起；exit 0 | ⬜ |
+
 ## F. 执行记录（回填区，2026-11-03 实测回填）
 
 - 设备快照：`sdk_gphone64_x86_64 emulator-5554` · **载体=ndk_translation**（host=x86_64；arm64 产物经翻译层运行）· API=37 · PAGESIZE=4096 · 制品 sha256=c6d9edfd…b1（host=device 一致）· 农场=copy(ok=0)

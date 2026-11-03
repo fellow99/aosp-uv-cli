@@ -61,6 +61,17 @@
 | FR-003-043 | SHOULD | 16KB 页设备采样（若测试设备 16KB）：核心用例复跑 | 设备 `getconf PAGESIZE` 记录；核心用例结论记录 |
 | FR-003-044 | SHOULD | 环境快照固化：ABI/API/页大小/SELinux/设备型号/制品 sha256 入报告 | 报告字段齐备 |
 
+### 2.5 App 域探针（probe-app，消费方形态；FR-003-050 族）
+
+| 编号 | 级别 | 需求 | 可证伪的验收判据 |
+|---|---|---|---|
+| FR-003-050 | MUST | 提供探针 App（`probe-app/`，独立 Gradle 工程，镜像 aosp-python-cli/probe-app 形态）：依赖 `uv-cli` AAR，`useLegacyPackaging=true`（D1）使 `libuv_cli.so` 物理落盘 `nativeLibraryDir` | APK 安装后 `nativeLibraryDir` 内存在 `libuv_cli.so` 且可执行位在 |
+| FR-003-051 | MUST | App 域 exec 探针：在 untrusted_app SELinux 域内 `ProcessBuilder` 启动 `nativeLibraryDir/libuv_cli.so`，采集 exit/stdout/stderr/耗时 | 版本串回程（P1 App 域等价）；app 域 exec 不被 SELinux 拒绝（D1 有效性核验） |
+| FR-003-052 | MUST | filesDir 环境注入（规划 §7 表的 App 域实例化）：`UV_CACHE_DIR`/`HOME`/`TMPDIR` 指向 filesDir 子目录后执行 | `uv cache dir` 输出 = 注入值且目录落 filesDir（P5 App 域） |
+| FR-003-053 | MUST | C2/D7 红线 App 域事实化：`uv python install` 在 App 域执行 | 失败形态记录（上游无 android managed python 下载），绝不静默成功 |
+| FR-003-054 | MUST | 探针结果结构化：逐条 PASS/FAIL/SKIP + JSON 报告落盘 `filesDir/probe-report-app.json`，adb 可回读 | `adb shell cat` 回读 JSON 合法；含设备快照（SELinux 域/文件标签/nativeDir） |
+| FR-003-055 | SHOULD | 探针自动执行：启动即后台线程全量运行（无交互依赖），UI 同步显示日志 | `am start` 后无需点击，报告自动落盘 |
+
 ## 3. 边界（不在本模块）
 
 - 构建/门禁/CI → 001/002；

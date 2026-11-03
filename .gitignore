@@ -29,3 +29,11 @@ target/
 
 # OS
 .DS_Store
+
+# probe-app（003-cli App 域探针；构建产物与 AAR 依赖不入库，P3）
+probe-app/.gradle/
+probe-app/build/
+probe-app/app/build/
+probe-app/local.properties
+probe-app/app/libs/*.aar
+uv-cli/src/main/resources/META-INF/uv-cli.properties
