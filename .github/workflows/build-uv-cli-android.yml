@@ -112,7 +112,7 @@ jobs:
         run: |
           mkdir -p build/out/LICENSES
           cp LICENSE uv-cli/THIRD-PARTY-NOTICES.md build/out/LICENSES/
-          (cd .dist/src/uv-src && cargo metadata --locked --format-version 1 --no-deps=false) \
+          (cd .dist/src/uv-src && cargo metadata --locked --format-version 1) \
             | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const m=JSON.parse(d);for(const p of m.packages){if(!p.license)continue;console.log(p.name+' '+p.version+' ['+p.license+']')}})" \
             > build/out/LICENSES/cargo-dependency-licenses.txt
           wc -l build/out/LICENSES/cargo-dependency-licenses.txt
