@@ -4,7 +4,7 @@
 **需求编号/名称：** **000-scaffold 工程搭建** · 规范文档存放目录：`specs/`
 **制品版本：** `0.9.0`（**draft** 计划值；= uv 上游版本，独立 semver，首产按 CI 实际钉选回写）
 **技术栈：** Gradle 9.4.1 / AGP 9.2.1 / vanniktech maven-publish 0.37.0（AAR 容器，`useLegacyPackaging=true`）+ 纯 Node host 工具链（exec 门禁 provision）+ Rust 交叉编译（`aarch64-linux-android`，M1 规划）/ rustls（M1 规划）
-**文档生成时间：** 2026-11-02 · **最后更新：** 2026-11-03 · **阶段：M0 骨架已完成；001/002/003 规格已立项（规划 §10.2）；M1 实现未开工**
+**文档生成时间：** 2026-11-02 · **最后更新：** 2026-11-05 · **阶段：M0 骨架已完成；001/002/003 已立项（规划 §10.2）；101-probe-app 本批新增（as-built + 能力披露 + 补充探针）；M1 实现未开工**
 
 > **权威规划文档是 [`../docs/000-工程规划.md`](../docs/000-工程规划.md)（v2.0，含 D1–D7 决策与 §10.2 模块注册）。**
 > 本目录是它的**收敛/展开版**：只做细化与验收，**不复制粘贴**，所有结论回引规划的 § 号。
@@ -24,7 +24,8 @@
 | 模块 | `001-building` | 4 | spec · plan · tasks · test-cases（FR-001-xxx；⬜ M1-T1~T4） |
 | 模块 | `002-building-workflow` | 4 | spec · plan · tasks · test-cases（FR-002-xxx；⬜ M1-T5） |
 | 模块 | `003-cli` | 4 | spec · plan · tasks · test-cases（FR-003-xxx；⬜ M2-T1/T2；**主用例全集 TC-003-00~17**） |
-| **合计** | **5 目录 / 25 文件** | | 项目级 9 + 模块 16 |
+| 模块 | `101-probe-app` | 4 | spec · plan · tasks · test-cases（FR-101-probe-xxx；**as-built 逆向** + 修复设计 §4.3 能力披露 + 补充探针 TC-UV-30~35） |
+| **合计** | **6 目录 / 29 文件** | | 项目级 9 + 模块 20 |
 
 > **刻意不生成** `API.md` / `overall-api.md`：本系统**不对外提供任何 API**——AAR 容器无 Kotlin/Java 源、无嵌入接口（exec 型独立进程）。对外契约 = Maven 坐标 + AAR 内容边界 + 运行期环境契约，见 [`overall-spec.md`](./overall-spec.md) §3.3/§5。
 > **刻意不生成** `overall-data-model.md`：唯一数据实体 `uv-cli.lock.json` 的全字段模型（含 `builtFrom.toolchain` 结构化扩展设计）已完整落在 [`000-scaffold/plan.md`](./000-scaffold/plan.md) §3。
@@ -106,6 +107,21 @@
 | 任务拆解 | [003-cli/tasks.md](./003-cli/tasks.md) | 14 | T1–T10 |
 | 测试用例 | [003-cli/test-cases.md](./003-cli/test-cases.md) | 58 | **TC-003-00~17 主用例全集**（A 自检/B 版本/C venv+pip/D TLS 反证/E 组合与限制） |
 
+### 101-probe-app — App 域探针工程（✅ 本批新增，as-built）
+
+> 003-cli 的 App 域探针载体独立成模块（specs-as-built 逆向既有实现）：untrusted_app SELinux 域 exec、
+> nativeLibraryDir 落盘（D1）、filesDir env 注入、启动即自动执行 + JSON 报告。本批补充**能力边界披露**
+> （修复设计 §4.3：纯 py 域可用 / C-Rust ≈ 不可装 / sdist 不可设备编译 / 无编译器 / `uv python install` 不支持 /
+> 隔离模式检查解释器依赖自洽 prefix）与 **6 条 TC-UV-30~35 边界事实探针**（verdict 三态 PASS/FAIL/FACT）。
+> 设备实测（2026-11-05，emulator-5554 ndk_translation App 域）：14 条 = PASS 8 + FACT 6 + FAIL 0。
+
+| 文档 | 链接 | 行数 | 说明 |
+|---|---|---|---|
+| 功能规格 | [101-probe-app/spec.md](./101-probe-app/spec.md) | 100 | FR-101-probe-001~017（技术无关 + RFC 2119）+ 实体 + 用户故事 + 验收场景 + NFR + 依赖 + 边界声明 |
+| 技术方案（as-built） | [101-probe-app/plan.md](./101-probe-app/plan.md) | 130 | 工程形态/行号映射（MainActivity 416 行）、env 注入表、补充探针判据、FR 交叉引用、构建/运行实测 |
+| 任务拆解 | [101-probe-app/tasks.md](./101-probe-app/tasks.md) | 29 | T1–T14（as-built 完成态；T5 规划 §10.2 登记未做→已记录） |
+| 测试用例 | [101-probe-app/test-cases.md](./101-probe-app/test-cases.md) | 42 | TC-003-20~27（既有）+ TC-UV-30~35（新增）判据与实测回填 |
+
 ---
 
 ## 四、模块编号一览（注册于规划 §10.2，2026-11-03）
@@ -116,9 +132,11 @@
 | 001 | 构建（源钉选 + Rust 交叉编译） | [`001-building/`](./001-building/) | ⬜ 立项 | 规划 §10 M1-T1~T4 + §10.2 |
 | 002 | 构建流水线（lock 回写 + CI + 发布） | [`002-building-workflow/`](./002-building-workflow/) | ⬜ 立项 | 规划 §10 M1-T5 + §10.2 |
 | 003 | CLI 运行期验证（shell 域探针） | [`003-cli/`](./003-cli/) | ⬜ 立项 | 规划 §10 M2-T1/T2 + §10.2 |
+| 101 | App 域探针工程（probe-app） | [`101-probe-app/`](./101-probe-app/) | ✅ 本批新增（as-built） | **§10.2 待登记**（本批不改规划文档；P8 登记留给编排者/后续批次）· 修复设计 §4.3 |
 
 > 编号分配须**先写进规划 §10.2 再建目录**（P8）；FR 族 = `FR-<模块号>-xxx`。
 > 本仓无 M1-T6/T7 类任务（provision 无扩展、无独立探针 App——shell 域 harness 即 003-cli 交付物，规划 §10.2 注）。
+> ⚠️ 101 编号按 P8 应先注册于规划 §10.2 于建目录前；本批按需求范围未改规划文档，登记待补（见 SPECS_CHECKLIST §五）。
 
 ---
 
@@ -132,6 +150,7 @@
 | **消费方（App 开发者）** | [`../README.md`](../README.md) → [overall-spec.md](./overall-spec.md) §5（边界与环境契约）→ 规划 §7（注入表） |
 | **测试 / QA** | [overall-test-cases.md](./overall-test-cases.md) → [003-cli/test-cases.md](./003-cli/test-cases.md)（主用例全集）→ [SPECS_CHECKLIST.md](./SPECS_CHECKLIST.md) §五 |
 | **发布工程师** | [overall-plan.md](./overall-plan.md) §6 → [002-building-workflow/plan.md](./002-building-workflow/plan.md) → [TECH.md](./TECH.md) §6.3 → 规划 §10.1 / §12 |
+| **101 探针 / App 域验证** | [101-probe-app/plan.md](./101-probe-app/plan.md)（as-built）→ [101-probe-app/test-cases.md](./101-probe-app/test-cases.md)（TC-UV-30~35）→ [003-cli/test-cases.md](./003-cli/test-cases.md) §E2 → 修复设计 §4.2/§4.3（能力边界口径） |
 
 ### 快照命令（先看证据，再看结论；均 ✅ 可跑）
 

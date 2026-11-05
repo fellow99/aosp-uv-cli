@@ -41,6 +41,22 @@ dependencies {
 终端侧：`PATH` 指向 `nativeLibraryDir` 后 `uv venv` / `uv pip install` 即可用；
 与 `python-cli`（aosp-python-cli）组合构成完整 python 工具链。
 
+## 能力边界（真实披露，口径来源：工作区 `docs/20261105-cli-实测问题-修复设计.md` §2.2/§4.3）
+
+本 AAR 交付的是 **uv 命令本体**（exec 型）。为防过度承诺，能力边界如实披露：
+
+| 能力项 | 边界 |
+|---|---|
+| 纯 Python wheel 包（纯 py 代码） | ✅ 可装：`uv pip install <纯py包>`（如 `six`/`packaging`） |
+| 含 C/Rust 扩展的包（如 `fastapi`→`pydantic-core`） | ⚠️ 仅当 PyPI 恰好有 `cpython-3.14-aarch64-linux-android` 轮子才可装；**现状 ≈ 不可装**（`pydantic-core` 无 android 轮子） |
+| sdist（源码包） | ⛔ 不可在设备上编译 |
+| 设备无编译器 | ⛔ 源码编译回退不可行 |
+| `uv python install`（managed python 下载） | ⛔ 不支持（违反 C2 运行期不得下载可执行件红线；上游无 android managed python） |
+| 解释器发现 | uv 用**隔离模式**检查解释器且**不吃 `PYTHONHOME`**；解释器不自洽（prefix 缺 stdlib 等）即失败 ⇒ **依赖环境层自洽 prefix**（修复设计 §4.2 C1） |
+
+> 设备侧可用组合：`uv venv` / `uv pip` 需 `UV_PYTHON` 指向**自洽 prefix**（python-cli 物化解释器 +
+> stdlib，见修复设计 §4.2）；纯 py 域可用；含原生扩展的包处于生态级边界（E1 披露，修复设计 §2.2/§5-4）。
+
 ## exec 型打包要点
 
 - **`useLegacyPackaging=true`**（必须物理落盘 `nativeLibraryDir`，否则 `execve` ENOENT）；

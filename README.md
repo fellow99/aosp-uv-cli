@@ -43,6 +43,23 @@ dependencies {
 Terminal side: with `PATH` pointing at `nativeLibraryDir`, `uv venv` / `uv pip install`
 work directly; combined with `python-cli` (aosp-python-cli) it forms a full python toolchain.
 
+## Capability boundary (honest disclosure; basis: workspace `docs/20261105-cli-实测问题-修复设计.md` §2.2/§4.3)
+
+This AAR ships the **uv command itself** (exec-form). Capability boundaries are disclosed as facts:
+
+| Capability | Boundary |
+|---|---|
+| Pure-Python wheel packages | ✅ installable: `uv pip install <pure-py-pkg>` (e.g. `six`/`packaging`) |
+| Packages with C/Rust extensions (e.g. `fastapi`→`pydantic-core`) | ⚠️ installable only if a matching `cpython-3.14-aarch64-linux-android` wheel exists; **currently ≈ not installable** (`pydantic-core` has no android wheel) |
+| sdist (source) | ⛔ cannot be compiled on device |
+| No compiler on device | ⛔ source-build fallback not viable |
+| `uv python install` (managed python) | ⛔ unsupported (C2 red line: no runtime executable downloads; no android managed python upstream) |
+| Interpreter discovery | uv inspects interpreters in **isolation mode** and **ignores `PYTHONHOME`**; a non-self-consistent prefix (missing stdlib, etc.) fails ⇒ **depends on a self-consistent prefix** from the environment bootstrap layer (fix-design §4.2 C1) |
+
+> On-device usage: `uv venv` / `uv pip` need `UV_PYTHON` pointing at a **self-consistent prefix**
+> (python-cli interpreter + stdlib, fix-design §4.2); the pure-py domain works; packages with native
+> extensions sit at an ecosystem boundary (E1 disclosed, fix-design §2.2/§5-4).
+
 ## Exec-form packaging points
 
 - **`useLegacyPackaging=true`** (must be physically extracted to `nativeLibraryDir`,
