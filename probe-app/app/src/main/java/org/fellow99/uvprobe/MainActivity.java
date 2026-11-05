@@ -28,6 +28,7 @@ import org.json.JSONObject;
  *  2) 注入：UV_CACHE_DIR / HOME / TMPDIR / PATH（规划 §7 表的 App 域实例化；SSL_CERT_FILE 永不注入，D4）；
  *  3) 判据：TC-003-20…27 逐条 PASS/FAIL + JSON 报告落盘 filesDir/probe-report-app.json；
  *  4) 启动即后台线程自动全量运行（FR-003-055，无交互依赖；UI 同步显示日志）。
+ *  5) 101-probe-app 补充边界探针 TC-UV-30~35（事实记录 verdict=FACT；修复设计 §2.2/§4.2/§4.3/§5）——既有 TC-003 保持不动。
  */
 public class MainActivity extends Activity {
 
@@ -124,11 +125,21 @@ public class MainActivity extends Activity {
     }
 
     private void record(String id, String title, boolean pass, Map<String, Object> ex, String detail) {
+        recordStatus(id, title, pass ? "PASS" : "FAIL", ex, detail);
+    }
+
+    /** 边界事实探针：verdict=FACT（PASS-FACT：记录事实非成败，详情承载明确判定/原因；TC-UV-* 用）。 */
+    private void recordFact(String id, String title, Map<String, Object> ex, String detail) {
+        recordStatus(id, title, "FACT", ex, detail);
+    }
+
+    /** 通用记录：三态 verdict（PASS / FAIL / FACT），字段与既有 TC-003 报告同口径。 */
+    private void recordStatus(String id, String title, String status, Map<String, Object> ex, String detail) {
         JSONObject o = new JSONObject();
         try {
             o.put("id", id);
             o.put("title", title);
-            o.put("verdict", pass ? "PASS" : "FAIL");
+            o.put("verdict", status);
             o.put("exit", ex == null ? null : ex.get("rc"));
             o.put("ms", ex == null ? 0 : ex.get("ms"));
             o.put("stdout", ex == null ? "" : trim((String) ex.get("out")));
@@ -136,7 +147,7 @@ public class MainActivity extends Activity {
             o.put("detail", detail == null ? "" : detail);
         } catch (Exception ignored) { }
         probes.add(o);
-        log(String.format("%-12s %-5s %s%s", id, pass ? "PASS" : "FAIL", title,
+        log(String.format("%-12s %-6s %s%s", id, status, title,
                 (detail == null || detail.isEmpty()) ? "" : "（" + detail + "）"));
     }
 
@@ -146,6 +157,34 @@ public class MainActivity extends Activity {
         return s.length() > 300 ? s.substring(0, 300) : s;
     }
 
+    /** 自洽 prefix 探测（修复设计 §4.2 C1）：<prefix>/bin/python 可执行 且 <prefix>/pyvenv.cfg 存在。
+     *  候选目录：HOME/.pyruntime、filesDir/.pyruntime、filesDir/pyruntime；亦接受 intent extra
+     *  `probe_uv_python`（python-cli/环境引导层注入自洽解释器时可验 UV_PYTHON 单次成功）。
+     *  命中返回解释器绝对路径；全部缺失 ⇒ null（App 裸域无 python-cli 物化 ⇒ 记边界事实）。 */
+    private String sniffSelfConsistentInterp() {
+        File home = new File(filesDir, "home");
+        String[] cands = {
+                new File(home, ".pyruntime/bin/python").getAbsolutePath(),
+                new File(home, ".pyruntime/bin/python3").getAbsolutePath(),
+                new File(filesDir, ".pyruntime/bin/python").getAbsolutePath(),
+                new File(filesDir, "pyruntime/bin/python").getAbsolutePath(),
+        };
+        for (String c : cands) {
+            File py = new File(c);                                // <p>/bin/python
+            File p = py.getParentFile() != null ? py.getParentFile().getParentFile() : null; // <p>
+            File cfg = p != null ? new File(p, "pyvenv.cfg") : null;
+            if (py.exists() && cfg != null && cfg.exists()) return c;
+        }
+        if (getIntent() != null) {
+            String ip = getIntent().getStringExtra("probe_uv_python");
+            if (ip != null && !ip.isEmpty() && new File(ip).exists()) {
+                File py = new File(ip);
+                File p = py.getParentFile() != null ? py.getParentFile().getParentFile() : null;
+                if (p != null && new File(p, "pyvenv.cfg").exists()) return ip;
+            }
+        }
+        return null;
+    }
     private void runAll() {
         probes.clear();
         uiLog.setLength(0);
@@ -235,6 +274,109 @@ public class MainActivity extends Activity {
             boolean p27 = (Integer) r27.get("rc") == 0;
             record("TC-003-27", "help 直出（App 域）", p27, r27, "");
 
+            // ══ 101-probe-app 补充边界探针 TC-UV-30~35（事实记录；依据：导演层级文档
+            //    D:/node-bridge-workspace/docs/20261105-cli-实测问题-修复设计.md §2.2/§4.2/§4.3/§5）
+            //    既有 TC-003 探针保持不动；verdict 三态 PASS / FAIL / FACT（PASS-FACT：事实非成败）══
+
+            // ── TC-UV-30 `uv --version` 行为事实（能力边界基线；修复设计 §2.2/§4.3）──────
+            Map<String, Object> r30 = exec(version, null);
+            String out30 = ((String) r30.get("out")).trim();
+            recordStatus("TC-UV-30", "uv --version 行为事实（边界基线）",
+                    (Integer) r30.get("rc") == 0 && out30.startsWith("uv ") ? "FACT" : "FAIL",
+                    r30, out30.isEmpty() ? "无输出（SELinux/exec 被拒？看 stderr）" : "回程：" + out30);
+
+            // ── TC-UV-31 `uv venv .v` 行为事实（重点捕获“Failed to inspect Python interpreter”文案；§2.2）──
+            File uvvenv = new File(filesDir, "uvpv/.v");
+            List<String> vcmd = new ArrayList<>();
+            vcmd.add(uvExe); vcmd.add("venv"); vcmd.add(uvvenv.getAbsolutePath());
+            Map<String, Object> r31 = exec(vcmd, null);
+            String all31 = ((String) r31.get("err")) + ((String) r31.get("out"));
+            int rc31 = (Integer) r31.get("rc");
+            boolean fail31 = rc31 != 0 && (all31.contains("Failed to inspect Python interpreter")
+                    || all31.toLowerCase().contains("interpreter") || all31.toLowerCase().contains("python"));
+            recordStatus("TC-UV-31", "uv venv .v 行为事实（解释器检索文案）",
+                    fail31 ? "FACT" : "FAIL", r31,
+                    rc31 == 0 ? "意外：uv venv 无解释器竟成功（与边界事实矛盾）"
+                            : (all31.contains("Failed to inspect Python interpreter")
+                                    ? "命中上游文案：Failed to inspect Python interpreter …（uv 隔离模式检查，不吃 PYTHONHOME；修复设计 §2.2）"
+                                    : "失败形态 rc=" + rc31 + "：" + trim(all31)));
+
+            // ── TC-UV-32 自洽 prefix + UV_PYTHON 单次成功（§4.2 C1 / §5-3；可验则验，否则边界事实）──
+            String scInterp = sniffSelfConsistentInterp();
+            if (scInterp == null) {
+                recordFact("TC-UV-32", "自洽 prefix + UV_PYTHON venv（边界事实）", null,
+                        "App 裸域无自洽 prefix（HOME=" + new File(filesDir, "home").getAbsolutePath()
+                                + " 下无 .pyruntime/bin/python+pyvenv.cfg，且无 intent probe_uv_python）；"
+                                + "UV_PYTHON 注入后的“一次成功”验证归属环境引导层（修复设计 §4.2/§5-3），本探针记录边界事实");
+            } else {
+                Map<String, String> en32 = new LinkedHashMap<>();
+                en32.put("UV_PYTHON", scInterp);
+                File pv32 = new File(filesDir, "uvpv/pv");
+                List<String> vc32 = new ArrayList<>();
+                vc32.add(uvExe); vc32.add("venv"); vc32.add(pv32.getAbsolutePath());
+                Map<String, Object> r32 = exec(vc32, en32);
+                String all32 = ((String) r32.get("err")) + ((String) r32.get("out"));
+                boolean ok32 = (Integer) r32.get("rc") == 0
+                        && pv32.exists() && new File(pv32, "pyvenv.cfg").exists();
+                recordStatus("TC-UV-32", "自洽 prefix + UV_PYTHON venv 单次成功",
+                        ok32 ? "PASS" : "FAIL", r32,
+                        ok32 ? "UV_PYTHON=" + scInterp + " 一次成功，pyvenv.cfg 已生成（修复设计 §5-3 达成）"
+                                : "失败 rc=" + r32.get("rc") + "：" + trim(all32));
+            }
+
+            // ── TC-UV-33 `uv pip install six`（纯 py wheel 域；§4.3）────────────────
+            List<String> s33 = new ArrayList<>();
+            s33.add(uvExe); s33.add("pip"); s33.add("install"); s33.add("six");
+            Map<String, Object> r33 = exec(s33, null);
+            String all33 = ((String) r33.get("err")) + ((String) r33.get("out"));
+            int rc33 = (Integer) r33.get("rc");
+            String lc33 = all33.toLowerCase();
+            boolean blk33 = lc33.contains("virtual environment") || lc33.contains("environment")
+                    || lc33.contains("interpreter") || lc33.contains("python")
+                    || lc33.contains("network") || lc33.contains("timeout");
+            recordStatus("TC-UV-33", "uv pip install 纯 py 包（six）边界事实",
+                    rc33 != 0 && blk33 ? "FACT" : "FAIL",
+                    r33,
+                    rc33 == 0 ? "意外成功：App 裸域无解释器/网络却装成 six（记录 stdout）→ 需复核"
+                            : "非静默失败 rc=" + rc33 + "：" + trim(all33)
+                                    + "（App 裸域先撞“无 virtual environment/解释器”——纯 py 域可用判据需 python-cli+网络 组合环境，修复设计 §4.3）");
+
+            // ── TC-UV-34 `uv pip install fastapi`（含 C/Rust 扩展 → pydantic-core；E1 边界）──
+            List<String> s34 = new ArrayList<>();
+            s34.add(uvExe); s34.add("pip"); s34.add("install"); s34.add("fastapi");
+            Map<String, Object> r34 = exec(s34, null);
+            String all34 = ((String) r34.get("err")) + ((String) r34.get("out"));
+            int rc34 = (Integer) r34.get("rc");
+            boolean e1 = all34.contains("pydantic-core") || all34.toLowerCase().contains("maturin")
+                    || all34.contains("linux-android") || all34.toLowerCase().contains("no matching distribution")
+                    || all34.contains("platform_dependent") || all34.toLowerCase().contains("wheel");
+            String lc34 = all34.toLowerCase();
+            boolean blk34 = lc34.contains("virtual environment") || lc34.contains("environment")
+                    || lc34.contains("interpreter") || lc34.contains("python")
+                    || lc34.contains("network") || lc34.contains("timeout");
+            recordStatus("TC-UV-34", "uv pip install 含 C/Rust 扩展（fastapi）E1 边界",
+                    rc34 != 0 && (e1 || blk34) ? "FACT" : "FAIL", r34,
+                    rc34 == 0 ? "意外成功：fastapi 竟可装（记录 stdout；E1 预期不成立？）→ 需复核"
+                            : (e1
+                                    ? "命中 E1 预期语义：「" + trim(all34)
+                                            + "」——含 C/Rust 扩展包无 android 轮子即失败且非静默（修复设计 §2.2/§4.3/§5-4）"
+                                    : "App 裸域前置拦截失败 rc=" + rc34 + "：" + trim(all34)
+                                            + "（无 virtual environment/解释器；E1 判据需 UV_PYTHON+网络 到轮子选择阶段）"));
+
+            // ── TC-UV-35 `uv python install` 不支持事实（§2.2/§4.3；TC-003-24 同口径增强）──
+            List<String> pyi35 = new ArrayList<>();
+            pyi35.add(uvExe); pyi35.add("python"); pyi35.add("install"); pyi35.add("3.12");
+            Map<String, Object> r35 = exec(pyi35, null);
+            String all35 = ((String) r35.get("err")) + ((String) r35.get("out"));
+            int rc35 = (Integer) r35.get("rc");
+            recordStatus("TC-UV-35", "uv python install 不支持（C2/D7 红线）",
+                    rc35 != 0 && (all35.contains("No download found") || all35.toLowerCase().contains("unsupported")
+                            || all35.toLowerCase().contains("no download")
+                            || all35.toLowerCase().contains("not supported")) ? "FACT" : "FAIL",
+                    r35,
+                    rc35 == 0 ? "意外：python install 3.12 竟成功 → 与 C2/D7 红线矛盾"
+                            : "失败形态 rc=" + rc35 + "：" + trim(all35)
+                                    + "（上游无 android managed python；修复设计 §2.2）");
             writeReport();
         }, "uv-probe").start();
     }
@@ -252,11 +394,14 @@ public class MainActivity extends Activity {
             try (FileWriter w = new FileWriter(f)) {
                 w.write(reportJson.toString(2));
             }
-            long npass = 0, nfail = 0;
+            long npass = 0, nfail = 0, nfact = 0;
             for (JSONObject o : probes) {
-                if ("PASS".equals(o.optString("verdict"))) npass++; else nfail++;
+                String v = o.optString("verdict");
+                if ("PASS".equals(v)) npass++;
+                else if ("FACT".equals(v)) nfact++;
+                else nfail++;
             }
-            log("\n== 汇总：PASS=" + npass + " FAIL=" + nfail
+            log("\n== 汇总：PASS=" + npass + " FAIL=" + nfail + " FACT=" + nfact
                     + " → " + f.getAbsolutePath() + "（adb shell cat 可回读） ==");
         } catch (Exception ex) {
             log("writeReport failed: " + ex);

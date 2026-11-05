@@ -37,3 +37,6 @@ probe-app/app/build/
 probe-app/local.properties
 probe-app/app/libs/*.aar
 uv-cli/src/main/resources/META-INF/uv-cli.properties
+
+# 探针测试报告留档（不入库）
+logs/
